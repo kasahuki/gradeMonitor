@@ -22,12 +22,17 @@ def get_reader():
         reader = easyocr.Reader(['en'], gpu=False)
     return reader
 
+import re
+
 def recognize_captcha(img_bytes):
     with open("temp_captcha.png", "wb") as f:
         f.write(img_bytes)
     result = get_reader().readtext("temp_captcha.png", detail=0)
     if result:
-        return ''.join(result).replace(' ', '')
+        # 清理识别结果：只保留字母和数字
+        text = ''.join(result).replace(' ', '')
+        text = re.sub(r'[^a-zA-Z0-9]', '', text)
+        return text if len(text) >= 4 else None
     return None
 
 def load_grades():
@@ -75,10 +80,10 @@ async def check_grades():
         page = await browser.new_page()
         
         # 登录
-        for attempt in range(5):
+        for attempt in range(10):  # 增加到10次
             print(f"\n=== 登录尝试 {attempt + 1} ===")
             await page.goto(LOGIN_URL)
-            await page.wait_for_timeout(1000)
+            await page.wait_for_timeout(1500)
             
             captcha_img = await page.locator('img#icode').screenshot()
             code = recognize_captcha(captcha_img)
