@@ -1,0 +1,5 @@
+playwright==1.40.0
+easyocr==1.7.1
+requests==2.31.0
+torch==2.1.0
+torchvision==0.16.0
