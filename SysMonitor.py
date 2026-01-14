@@ -25,34 +25,69 @@ def get_reader():
 import re
 
 async def get_captcha_image(page):
-    """直接下载验证码图片，而不是截图"""
-    img = page.locator('img#icode')
-    src = await img.get_attribute('src')
-    
-    # 获取当前页面的 cookies
-    cookies = await page.context.cookies()
-    cookie_str = '; '.join([f"{c['name']}={c['value']}" for c in cookies])
-    
-    # 构建完整 URL
-    base_url = page.url.rsplit('/', 1)[0]
-    img_url = f"{base_url}/{src}"
-    
-    # 下载图片
-    headers = {'Cookie': cookie_str}
-    resp = requests.get(img_url, headers=headers, timeout=10)
-    if resp.status_code == 200:
-        return resp.content
-    return None
+    """获取验证码图片"""
+    try:
+        img = page.locator('img#icode')
+        await img.wait_for(state='visible', timeout=5000)
+        
+        # 方法1: 检查是否是 base64 图片
+        src = await img.get_attribute('src')
+        if src and src.startswith('data:image'):
+            import base64
+            # 格式: data:image/png;base64,xxxxx
+            base64_data = src.split(',', 1)[1]
+            return base64.b64decode(base64_data)
+        
+        # 方法2: 直接用 Playwright 截图验证码元素
+        screenshot = await img.screenshot()
+        if screenshot and len(screenshot) > 100:
+            return screenshot
+        
+        # 方法3: 用 page.request 下载（保持 session）
+        if src:
+            if src.startswith('/'):
+                from urllib.parse import urljoin
+                img_url = urljoin(page.url, src)
+            elif not src.startswith('http'):
+                base_url = page.url.rsplit('/', 1)[0]
+                img_url = f"{base_url}/{src}"
+            else:
+                img_url = src
+            
+            response = await page.request.get(img_url)
+            if response.ok:
+                return await response.body()
+        
+        return None
+    except Exception as e:
+        print(f"获取验证码失败: {e}")
+        return None
 
 def recognize_captcha(img_bytes):
+    # 验证图片数据有效性
+    if not img_bytes or len(img_bytes) < 100:
+        print(f"验证码图片数据无效，大小: {len(img_bytes) if img_bytes else 0} bytes")
+        return None
+    
+    # 检查是否为有效的图片格式（PNG/JPEG/GIF 头部）
+    if not (img_bytes[:8] == b'\x89PNG\r\n\x1a\n' or  # PNG
+            img_bytes[:2] == b'\xff\xd8' or           # JPEG
+            img_bytes[:6] in (b'GIF87a', b'GIF89a')): # GIF
+        print("验证码图片格式无效")
+        return None
+    
     with open("temp_captcha.png", "wb") as f:
         f.write(img_bytes)
-    result = get_reader().readtext("temp_captcha.png", detail=0)
-    if result:
-        # 清理识别结果：只保留字母和数字，取前4位
-        text = ''.join(result).replace(' ', '')
-        text = re.sub(r'[^a-zA-Z0-9]', '', text)
-        return text[:4] if len(text) >= 4 else None
+    
+    try:
+        result = get_reader().readtext("temp_captcha.png", detail=0)
+        if result:
+            # 清理识别结果：只保留字母和数字，取前4位
+            text = ''.join(result).replace(' ', '')
+            text = re.sub(r'[^a-zA-Z0-9]', '', text)
+            return text[:4] if len(text) >= 4 else None
+    except Exception as e:
+        print(f"OCR识别异常: {e}")
     return None
 
 def load_grades():
