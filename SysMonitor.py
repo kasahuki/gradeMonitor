@@ -24,6 +24,26 @@ def get_reader():
 
 import re
 
+async def get_captcha_image(page):
+    """直接下载验证码图片，而不是截图"""
+    img = page.locator('img#icode')
+    src = await img.get_attribute('src')
+    
+    # 获取当前页面的 cookies
+    cookies = await page.context.cookies()
+    cookie_str = '; '.join([f"{c['name']}={c['value']}" for c in cookies])
+    
+    # 构建完整 URL
+    base_url = page.url.rsplit('/', 1)[0]
+    img_url = f"{base_url}/{src}"
+    
+    # 下载图片
+    headers = {'Cookie': cookie_str}
+    resp = requests.get(img_url, headers=headers, timeout=10)
+    if resp.status_code == 200:
+        return resp.content
+    return None
+
 def recognize_captcha(img_bytes):
     with open("temp_captcha.png", "wb") as f:
         f.write(img_bytes)
@@ -85,7 +105,10 @@ async def check_grades():
             await page.goto(LOGIN_URL)
             await page.wait_for_timeout(1500)
             
-            captcha_img = await page.locator('img#icode').screenshot()
+            captcha_img = await get_captcha_image(page)
+            if not captcha_img:
+                print("获取验证码图片失败")
+                continue
             code = recognize_captcha(captcha_img)
             print(f"识别验证码: {code}")
             
