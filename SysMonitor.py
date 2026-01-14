@@ -49,10 +49,10 @@ def recognize_captcha(img_bytes):
         f.write(img_bytes)
     result = get_reader().readtext("temp_captcha.png", detail=0)
     if result:
-        # 清理识别结果：只保留字母和数字
+        # 清理识别结果：只保留字母和数字，取前4位
         text = ''.join(result).replace(' ', '')
         text = re.sub(r'[^a-zA-Z0-9]', '', text)
-        return text if len(text) >= 4 else None
+        return text[:4] if len(text) >= 4 else None
     return None
 
 def load_grades():
@@ -121,6 +121,20 @@ async def check_grades():
             await page.click('#RadioButtonList1_2')
             await page.click('#Button1')
             await page.wait_for_timeout(2000)
+            
+            # 打印当前URL和页面标题，帮助调试
+            print(f"当前URL: {page.url}")
+            title = await page.title()
+            print(f"页面标题: {title}")
+            
+            # 检查是否有错误提示
+            try:
+                error_msg = await page.locator('script').all_text_contents()
+                for msg in error_msg:
+                    if 'alert' in msg:
+                        print(f"页面提示: {msg[:100]}")
+            except:
+                pass
             
             if "xs_main" in page.url:
                 print("✅ 登录成功!")

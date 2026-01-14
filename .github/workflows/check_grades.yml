@@ -44,6 +44,15 @@ jobs:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: python SysMonitor.py
       
+      - name: Upload captcha for debug
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captcha-debug
+          path: temp_captcha.png
+          retention-days: 1
+          if-no-files-found: ignore
+      
       - name: Upload grades cache
         uses: actions/upload-artifact@v4
         with:
