@@ -2,7 +2,7 @@ name: Check Grades
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 每小时整点运行（UTC时间）
+    - cron: '*/30 * * * *'  # 每30分钟运行一次（UTC时间）
   workflow_dispatch:  # 支持手动触发
 
 jobs:
